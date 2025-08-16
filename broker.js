@@ -24,6 +24,15 @@ broker.createService({
                     "GET /healthz": "health.healthz",
                     "GET /readyz": "health.readyz",
                 },
+                onError(req, res, err) {
+                    res.setHeader("Content-Type", "application/json; charset=utf-8");
+                    res.writeHead(err.code || 500);
+                    res.end(JSON.stringify({
+                        name: err.name,
+                        message: err.message,
+                        data: err.data
+                    }));
+                },
             },
             // 2) ruta api negocio
             {
@@ -53,6 +62,15 @@ broker.createService({
 });
 
 broker.loadServices(path.join(__dirname, "services"));
-broker.start().then(() =>
-    broker.logger.info("API escuchando en el puerto", process.env.PORT || 3002)
-);
+// broker.start().then(() =>
+//     broker.logger.info("API escuchando en el puerto", process.env.PORT || 3002)
+// );
+broker.start().then(async () => {
+    try {
+        await broker.waitForServices(["health"], 3000);
+        broker.logger.info("Servicio 'health' cargado ");
+    } catch {
+        broker.logger.error("Servicio 'health' NO cargó)");
+    }
+    broker.logger.info("API escuchando en el puerto", process.env.PORT || 3002);
+});
