@@ -1,6 +1,7 @@
 require("dotenv").config();
 const { ServiceBroker } = require("moleculer");
 const ApiGateway = require("moleculer-web");
+const path = require("path");
 
 const broker = new ServiceBroker({ logger: true, logLevel: "info", requestTimeout: 30 * 1000 });
 
@@ -37,5 +38,5 @@ broker.createService({
     }
 });
 
-broker.loadServices("./services");
+broker.loadServices(path.join(__dirname, "services"));
 broker.start().then(() => broker.logger.info("API escuchando en el puerto", process.env.PORT || 3002));
