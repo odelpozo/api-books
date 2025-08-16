@@ -52,7 +52,7 @@ module.exports = {
                     const author = Array.isArray(d.author_name) ? d.author_name[0] : (d.author_name || "");
                     const year = d.first_publish_year || null;
                     const found = map.get(k(title, author));
-                    const cover = found
+                    const cover = (found && found.coverBase64)
                         ? `/api/books/library/front-cover/${found._id}`
                         : (d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : null);
                     return { title, author, year, cover };
@@ -68,17 +68,46 @@ module.exports = {
             }
         },
 
+        // create: {
+        //     params: {
+        //         title: "string",
+        //         author: { type: "string", optional: true },
+        //         year: { type: "number", optional: true, convert: true },
+        //         coverBase64: { type: "string", optional: true },
+        //         review: { type: "string", optional: true, max: 500 },
+        //         rating: { type: "number", optional: true, convert: true, min: 1, max: 5 }
+        //     },
+        //     async handler(ctx) { return (await Book.create(ctx.params)).toObject(); }
+        // },
         create: {
             params: {
                 title: "string",
                 author: { type: "string", optional: true },
                 year: { type: "number", optional: true, convert: true },
                 coverBase64: { type: "string", optional: true },
+                coverUrl: { type: "string", optional: true },   // ← nuevo
                 review: { type: "string", optional: true, max: 500 },
                 rating: { type: "number", optional: true, convert: true, min: 1, max: 5 }
             },
-            async handler(ctx) { return (await Book.create(ctx.params)).toObject(); }
+            async handler(ctx) {
+                let { title, author, year, coverBase64, coverUrl, review, rating } = ctx.params;
+
+                if (!coverBase64 && coverUrl) {
+                    try {
+                        const resp = await axios.get(coverUrl, { responseType: "arraybuffer" });
+                        const mime = resp.headers["content-type"] || "image/jpeg";
+                        const b64 = Buffer.from(resp.data).toString("base64");
+                        coverBase64 = `data:${mime};base64,${b64}`;
+                    } catch (e) {
+                        this.logger.warn("No se pudo descargar coverUrl:", e.message);
+                    }
+                }
+
+                const doc = await Book.create({ title, author, year, coverBase64, review, rating });
+                return doc.toObject();
+            }
         },
+
 
         list: {
             params: {
@@ -86,7 +115,6 @@ module.exports = {
                 author: { type: "string", optional: true },
                 excludeNoReview: { type: "boolean", optional: true, convert: true },
                 sort: { type: "string", optional: true },
-                // (opcional) pagina/limite
                 page: { type: "number", optional: true, convert: true },
                 pageSize: { type: "number", optional: true, convert: true }
             },
@@ -122,13 +150,15 @@ module.exports = {
             params: {
                 id: "string",
                 review: { type: "string", optional: true, max: 500 },
-                rating: { type: "number", optional: true, convert: true, min: 1, max: 5 }
+                rating: { type: "number", optional: true, convert: true, min: 1, max: 5 },
+                coverBase64: { type: "string", optional: true }
             },
             async handler(ctx) {
-                const { id, review, rating } = ctx.params;
+                const { id, review, rating, coverBase64 } = ctx.params;
                 const $set = {};
                 if (review !== undefined) $set.review = review;
                 if (rating !== undefined) $set.rating = rating;
+                if (coverBase64 !== undefined) $set.coverBase64 = coverBase64;
                 await Book.updateOne({ _id: id }, { $set });
                 return await Book.findById(id).lean();
             }
