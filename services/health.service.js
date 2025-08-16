@@ -1,0 +1,73 @@
+
+const os = require("os");
+const mongoose = require("mongoose");
+
+function mongoStateToText(state) {
+    return ({
+        0: "disconnected",
+        1: "connected",
+        2: "connecting",
+        3: "disconnecting"
+    }[state] || "unknown");
+}
+
+module.exports = {
+    name: "health",
+
+    actions: {
+        // Liveness: el proceso corre
+        healthz: {
+            async handler(ctx) {
+                const now = Date.now();
+                const upMs = process.uptime() * 1000;
+                const mongoState = mongoose.connection?.readyState ?? 0;
+
+                return {
+                    status: "ok",
+                    service: this.broker.nodeID,
+                    time: new Date(now).toISOString(),
+                    uptime_ms: upMs,
+                    memory: process.memoryUsage(),
+                    cpu_loadavg: os.loadavg(),
+                    mongo: {
+                        state: mongoStateToText(mongoState),
+                        readyState: mongoState
+                    }
+                };
+            }
+        },
+
+        // Readiness: además de vivo, intenta "ping" a Mongo
+        readyz: {
+            timeout: 2500, // corta rápido si Mongo no responde
+            async handler(ctx) {
+                const mongoState = mongoose.connection?.readyState ?? 0;
+
+                // Si no está conectado, falla readiness
+                if (mongoState !== 1) {
+                    ctx.meta.$statusCode = 503;
+                    return {
+                        status: "degraded",
+                        mongo: { state: mongoStateToText(mongoState), readyState: mongoState }
+                    };
+                }
+
+                // Ping explícito al servidor
+                try {
+                    await mongoose.connection.db.admin().ping();
+                    return {
+                        status: "ready",
+                        mongo: { state: "connected", ready: true }
+                    };
+                } catch (err) {
+                    ctx.meta.$statusCode = 503;
+                    return {
+                        status: "degraded",
+                        mongo: { state: "connected", ready: false },
+                        error: err.message
+                    };
+                }
+            }
+        }
+    }
+};
