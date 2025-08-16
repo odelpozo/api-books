@@ -9,10 +9,11 @@ broker.createService({
     mixins: [ApiGateway],
     settings: {
         port: process.env.PORT || 3002,
+        ip: "0.0.0.0",
         routes: [{
             path: "/api",
             cors: {
-                origin: ['https://tu-app.vercel.app'],
+                origin: ["*"],
                 methods: ['GET', 'POST', 'PUT', 'DELETE'],
                 credentials: false
             },
