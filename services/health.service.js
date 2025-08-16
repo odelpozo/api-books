@@ -15,7 +15,7 @@ module.exports = {
     name: "health",
 
     actions: {
-        // Liveness: el proceso corre
+
         healthz: {
             async handler(ctx) {
                 const now = Date.now();
@@ -37,13 +37,13 @@ module.exports = {
             }
         },
 
-        // Readiness: además de vivo, intenta "ping" a Mongo
+
         readyz: {
-            timeout: 2500, // corta rápido si Mongo no responde
+            timeout: 2500,
             async handler(ctx) {
                 const mongoState = mongoose.connection?.readyState ?? 0;
 
-                // Si no está conectado, falla readiness
+
                 if (mongoState !== 1) {
                     ctx.meta.$statusCode = 503;
                     return {
@@ -52,7 +52,7 @@ module.exports = {
                     };
                 }
 
-                // Ping explícito al servidor
+
                 try {
                     await mongoose.connection.db.admin().ping();
                     return {
