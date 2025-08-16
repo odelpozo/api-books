@@ -6,6 +6,9 @@
   "scripts": {
     "start": "node broker.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
   "keywords": [],
   "author": "Orlando del Pozo F.",
   "license": "ISC",
